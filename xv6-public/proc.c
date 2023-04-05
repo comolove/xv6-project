@@ -10,6 +10,12 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+	struct proc* L0_proc[NPROC];
+	struct proc* L1_proc[NPROC];
+	struct proc* L2_proc[NPROC];
+	uint L0_start, L0_end;
+	uint L1_start, L1_end;
+	uint L2_start, L2_end;
 } ptable;
 
 static struct proc *initproc;
@@ -111,6 +117,10 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+
+	// Alloc L0 scheduler
+	ptable.L0_proc[ptable.L0_end++] = p;
+	ptable.L0_end %= NPROC
 
   return p;
 }
@@ -328,8 +338,7 @@ scheduler(void)
   
   for(;;){
     // Enable interrupts on this processor.
-    sti();
-
+    sti()
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -351,7 +360,6 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
 }
 
