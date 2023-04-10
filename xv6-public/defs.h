@@ -102,7 +102,16 @@ int             piperead(struct pipe*, char*, int);
 int             pipewrite(struct pipe*, char*, int);
 
 // mlfq.c
-
+void            L0_push(struct proc* p);
+void            L1_push(struct proc* p);
+void            L2_push(struct proc* p);
+struct proc*    L0_pop(void);
+struct proc*    L1_pop(void);
+struct proc*    L2_pop(void);
+int             L0_scheduling(void);
+int             L1_scheduling(void);
+int             L2_scheduling(void);
+extern struct MLFQ mlfq;
 
 //PAGEBREAK: 16
 // proc.c
@@ -123,15 +132,6 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-void            L0_push(struct proc* p);
-void            L1_push(struct proc* p);
-void            L2_push(struct proc* p);
-struct proc*    L0_pop(void);
-struct proc*    L1_pop(void);
-struct proc*    L2_pop(void);
-int             L0_scheduling(void);
-int             L1_scheduling(void);
-int             L2_scheduling(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
