@@ -6,18 +6,15 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "mlfq.h"
 
-struct MLFQ {
-  struct proc* L0_proc[LNPROC];
-	struct proc* L1_proc[LNPROC];
-	struct proc* L2_proc[LNPROC];
-	uint L0_start, L0_end;
-	uint L1_start, L1_end;
-	uint L2_size;
-} mlfq;
+struct MLFQ mlfq;
 
+//push and pop L0,L1 in circular queue
 void
 L0_push(struct proc* p) {
+  p->mlfq_level = 0;
+  p->time_quantum = 0;
   mlfq.L0_proc[mlfq.L0_end++] = p;
 	mlfq.L0_end %= LNPROC;
 }
@@ -31,6 +28,8 @@ L0_pop() {
 
 void
 L1_push(struct proc* p) {
+  p->mlfq_level = 1;
+  p->time_quantum = 0;
   mlfq.L1_proc[mlfq.L1_end++] = p;
 	mlfq.L1_end %= LNPROC;
 }
@@ -42,12 +41,23 @@ L1_pop() {
   return p;
 }
 
+//push to leaf element and heapify.
 void
 L2_push(struct proc* p) {
   mlfq.L2_proc[++mlfq.L2_size] = p;
   uint cur_index = mlfq.L2_size;
   uint parent_index = cur_index/2;
   struct proc* cur_p,* parent_p;
+
+  //same priority process need to schedule earlier process.
+  acquire(&tickslock);
+
+  p->priority += ticks;
+
+  release(&tickslock);
+
+  p->mlfq_level = 2;
+  p->time_quantum = 0;
 
   while(cur_index != 1) {
     cur_p = mlfq.L2_proc[cur_index];
@@ -63,6 +73,7 @@ L2_push(struct proc* p) {
   }
 }
 
+//pop root element and heapify remain elements.
 struct proc*
 L2_pop(void) {
   struct proc* pop_p = mlfq.L2_proc[1];
@@ -92,6 +103,11 @@ L2_pop(void) {
     cur_index = smaller_child_index;
   }
 
+  //priority up
+  int next_priority = (pop_p->priority/100 - 1)*100;
+  if(next_priority < 0) next_priority = 0;
+  pop_p->priority = next_priority;
+
   return pop_p;
 }
 
@@ -108,11 +124,11 @@ L0_scheduling(void) {
     if(p->state != RUNNABLE)
       continue;
 
+    cprintf("0");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
     proc_cnt++;
-
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
@@ -122,11 +138,6 @@ L0_scheduling(void) {
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
-    p->time_quantum++;
-    if(p->time_quantum == L0TIMEMAX) {
-      L1_push(p);
-      p->time_quantum = 0;
-    }
     c->proc = 0;
   }
 
@@ -146,6 +157,7 @@ L1_scheduling(void) {
     if(p->state != RUNNABLE)
       continue;
 
+    cprintf("1");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -160,11 +172,6 @@ L1_scheduling(void) {
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
-    p->time_quantum++;
-    if(p->time_quantum == L1TIMEMAX) {
-      L2_push(p);
-      p->time_quantum = 0;
-    }
     c->proc = 0;
   }
 
@@ -184,6 +191,7 @@ L2_scheduling(void) {
     if(p->state != RUNNABLE)
       continue;
 
+    cprintf("2");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -202,4 +210,26 @@ L2_scheduling(void) {
   }
 
   return proc_cnt;
+}
+
+//yield mode : 1
+//else mode : 0
+//because yield have to enqueue to higher level queue
+void 
+enqueue(struct proc* p, uint mode) {
+  uint queue_level = p->mlfq_level + mode;
+  if(queue_level == 0) {
+    L0_push(p);
+  } else if (queue_level == 1) {
+    L1_push(p);
+  } else {
+    L2_push(p);
+  }
+
+}
+
+int 
+getLevel(void) {
+  if(myproc()) return myproc()->mlfq_level;
+  return -1;
 }

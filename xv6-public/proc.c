@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "mlfq.h"
 
 struct {
   struct spinlock lock;
@@ -88,15 +89,13 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  release(&ptable.lock);
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
-    release(&ptable.lock);
     return 0;
   }
-  L0_push(p);
-  release(&ptable.lock);
 
   sp = p->kstack + KSTACKSIZE;
 
@@ -153,6 +152,7 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
+  enqueue(p,0);
   p->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -219,6 +219,7 @@ fork(void)
 
   acquire(&ptable.lock);
 
+  enqueue(np,0);
   np->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -377,7 +378,9 @@ void
 yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE;
+  struct proc* p = myproc();
+  p->state = RUNNABLE;
+  enqueue(p,1);
   sched();
   release(&ptable.lock);
 }
@@ -451,8 +454,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
+      enqueue(p,0);
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -477,8 +482,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING) {
+        enqueue(p,0);
         p->state = RUNNABLE;
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -522,4 +529,41 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+void
+setPriority(uint pid, uint priority) {
+  struct proc* p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      p->priority = priority*100;
+
+      release(&ptable.lock);
+      return;
+    }
+  }
+  release(&ptable.lock);
+}
+
+void
+priorityBoosting(struct proc* p) {
+  acquire(&ptable.lock);
+  struct proc* cur_p;
+  if(p) mlfq.L0_proc[--mlfq.L0_start] = p;
+
+  while(mlfq.L1_start != mlfq.L1_end) {
+    cur_p = L1_pop();
+    cur_p->priority = 300;
+    L0_push(cur_p);
+  }
+
+  while(mlfq.L2_size) {
+    cur_p = L2_pop();
+    cur_p->priority = 300;
+    L0_push(cur_p);
+  }
+
+  release(&ptable.lock);
 }

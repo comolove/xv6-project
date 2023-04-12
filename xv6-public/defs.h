@@ -111,6 +111,8 @@ struct proc*    L2_pop(void);
 int             L0_scheduling(void);
 int             L1_scheduling(void);
 int             L2_scheduling(void);
+void            enqueue(struct proc* p, uint mode);
+int             getLevel(void);
 extern struct MLFQ mlfq;
 
 //PAGEBREAK: 16
@@ -132,6 +134,8 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            setPriority(uint pid, uint priority);
+void            priorityBoosting(struct proc* p);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

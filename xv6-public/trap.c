@@ -40,6 +40,14 @@ trap(struct trapframe *tf)
 	cprintf("user interrupt 128 called!\n");
 	exit();
   }
+  if(tf->trapno == 129){
+	//TODO
+	exit();
+  }
+  if(tf->trapno == 130){
+	//TODO
+	exit();
+  }
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
       exit();
@@ -54,8 +62,13 @@ trap(struct trapframe *tf)
   case T_IRQ0 + IRQ_TIMER:
     if(cpuid() == 0){
       acquire(&tickslock);
+      struct proc* p = myproc();
+      if(p) p->time_quantum++;
       ticks++;
-      myproc()->time_quantum++;
+      if(ticks == 100) {
+        priorityBoosting(p);
+        ticks = 0;
+      }
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -99,6 +112,11 @@ trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
+  acquire(&tickslock);
+
+  if(myproc()) cprintf("pid, kstack, tq, priority, mlfqlevel, ticks %d %d %d %d %d %d\n",myproc()->pid,myproc()->kstack,myproc()->time_quantum,myproc()->priority,myproc()->mlfq_level,ticks);
+
+  release(&tickslock);
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
@@ -109,7 +127,7 @@ trap(struct trapframe *tf)
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER &&
-     myproc()->mlfq_level*2 + 4 == myproc()->time_quantum)
+     myproc()->mlfq_level*2 + 4 == myproc()->time_quantum) 
     yield();
 
   // Check if the process has been killed since we yielded
