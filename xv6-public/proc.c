@@ -113,7 +113,7 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
-  p->priority = 300;
+  p->priority = 3;
   p->mlfq_level = 0;
 
   return p;
@@ -152,7 +152,7 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
-  enqueue(p,0);
+  enqueue(p);
   p->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -219,7 +219,7 @@ fork(void)
 
   acquire(&ptable.lock);
 
-  enqueue(np,0);
+  enqueue(np);
   np->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -380,7 +380,7 @@ yield(void)
   acquire(&ptable.lock);  //DOC: yieldlock
   struct proc* p = myproc();
   p->state = RUNNABLE;
-  enqueue(p,1);
+  enqueue(p);
   sched();
   release(&ptable.lock);
 }
@@ -456,7 +456,7 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
-      enqueue(p,0);
+      enqueue(p);
     }
 }
 
@@ -483,7 +483,7 @@ kill(int pid)
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING) {
-        enqueue(p,0);
+        enqueue(p);
         p->state = RUNNABLE;
       }
       release(&ptable.lock);
@@ -538,7 +538,7 @@ setPriority(uint pid, uint priority) {
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-      p->priority = priority*100;
+      p->priority = priority;
 
       release(&ptable.lock);
       return;
@@ -551,17 +551,39 @@ void
 priorityBoosting(struct proc* p) {
   acquire(&ptable.lock);
   struct proc* cur_p;
-  if(p) mlfq.L0_proc[--mlfq.L0_start] = p;
+  if(p) {
+    if(!mlfq.L0_start) mlfq.L0_start = LNPROC;
+    mlfq.L0_proc[--mlfq.L0_start] = p;
+    p->mlfq_level = 0;
+    p->priority = 3;
+    cprintf("-1\n");
+  }
+
+  int i = mlfq.L0_start;
+  
+  while(i != mlfq.L0_end) {
+    cprintf("0\n");
+    mlfq.L0_proc[i]->time_quantum = 0;
+    i = (i+1)%LNPROC;
+  }
 
   while(mlfq.L1_start != mlfq.L1_end) {
+    cprintf("1\n");
     cur_p = L1_pop();
-    cur_p->priority = 300;
+    cur_p->priority = 3;
+    cur_p->mlfq_level = 0;
+    cur_p->time_quantum = 0;
+    cur_p->time_enter = 0;
     L0_push(cur_p);
   }
 
   while(mlfq.L2_size) {
+    cprintf("2\n");
     cur_p = L2_pop();
-    cur_p->priority = 300;
+    cur_p->priority = 3;
+    cur_p->mlfq_level = 0;
+    cur_p->time_quantum = 0;
+    cur_p->time_enter = 0;
     L0_push(cur_p);
   }
 

@@ -111,7 +111,7 @@ struct proc*    L2_pop(void);
 int             L0_scheduling(void);
 int             L1_scheduling(void);
 int             L2_scheduling(void);
-void            enqueue(struct proc* p, uint mode);
+void            enqueue(struct proc* p);
 int             getLevel(void);
 extern struct MLFQ mlfq;
 

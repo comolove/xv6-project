@@ -13,8 +13,6 @@ struct MLFQ mlfq;
 //push and pop L0,L1 in circular queue
 void
 L0_push(struct proc* p) {
-  p->mlfq_level = 0;
-  p->time_quantum = 0;
   mlfq.L0_proc[mlfq.L0_end++] = p;
 	mlfq.L0_end %= LNPROC;
 }
@@ -28,8 +26,6 @@ L0_pop() {
 
 void
 L1_push(struct proc* p) {
-  p->mlfq_level = 1;
-  p->time_quantum = 0;
   mlfq.L1_proc[mlfq.L1_end++] = p;
 	mlfq.L1_end %= LNPROC;
 }
@@ -49,21 +45,11 @@ L2_push(struct proc* p) {
   uint parent_index = cur_index/2;
   struct proc* cur_p,* parent_p;
 
-  //same priority process need to schedule earlier process.
-  acquire(&tickslock);
-
-  p->priority += ticks;
-
-  release(&tickslock);
-
-  p->mlfq_level = 2;
-  p->time_quantum = 0;
-
   while(cur_index != 1) {
     cur_p = mlfq.L2_proc[cur_index];
     parent_p = mlfq.L2_proc[cur_index/2];
 
-    if(cur_p->priority >= parent_p->priority) 
+    if(cur_p->priority > parent_p->priority || (cur_p->priority == parent_p->priority && cur_p->time_enter > parent_p->time_enter)) 
       break;
 
     mlfq.L2_proc[cur_index] = parent_p;
@@ -84,13 +70,19 @@ L2_pop(void) {
     cur_p = mlfq.L2_proc[cur_index];
     smaller_child_index = cur_index;
 
-    if(2*cur_index <= mlfq.L2_size &&
-      mlfq.L2_proc[2*cur_index]->priority < cur_p->priority) {
+    if((2*cur_index <= mlfq.L2_size &&
+      mlfq.L2_proc[2*cur_index]->priority < cur_p->priority) ||
+      (mlfq.L2_proc[2*cur_index]->priority == cur_p->priority && 
+      mlfq.L2_proc[2*cur_index]->time_enter < cur_p->time_enter) ) 
+      {
         smaller_child_index = 2*cur_index;
       }
 
-    if(2*cur_index+1 <= mlfq.L2_size &&
-      mlfq.L2_proc[2*cur_index+1]->priority < mlfq.L2_proc[smaller_child_index]->priority) {
+    if((2*cur_index+1 <= mlfq.L2_size &&
+      mlfq.L2_proc[2*cur_index+1]->priority < mlfq.L2_proc[smaller_child_index]->priority) ||
+      (mlfq.L2_proc[2*cur_index+1]->priority == mlfq.L2_proc[smaller_child_index]->priority && 
+      mlfq.L2_proc[2*cur_index]->time_enter < mlfq.L2_proc[smaller_child_index]->time_enter)) 
+      {
         smaller_child_index = 2*cur_index+1;
       }
     
@@ -102,11 +94,6 @@ L2_pop(void) {
 
     cur_index = smaller_child_index;
   }
-
-  //priority up
-  int next_priority = (pop_p->priority/100 - 1)*100;
-  if(next_priority < 0) next_priority = 0;
-  pop_p->priority = next_priority;
 
   return pop_p;
 }
@@ -123,8 +110,6 @@ L0_scheduling(void) {
 
     if(p->state != RUNNABLE)
       continue;
-
-    cprintf("0");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -156,8 +141,6 @@ L1_scheduling(void) {
 
     if(p->state != RUNNABLE)
       continue;
-
-    cprintf("1");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -190,8 +173,6 @@ L2_scheduling(void) {
 
     if(p->state != RUNNABLE)
       continue;
-
-    cprintf("2");
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -216,8 +197,28 @@ L2_scheduling(void) {
 //else mode : 0
 //because yield have to enqueue to higher level queue
 void 
-enqueue(struct proc* p, uint mode) {
-  uint queue_level = p->mlfq_level + mode;
+enqueue(struct proc* p) {
+  uint queue_level = p->mlfq_level;
+  if(p->time_quantum == 2*queue_level+4) {
+    queue_level++;
+    p->time_quantum = 0;
+    
+    if(queue_level == 2) {
+      acquire(&tickslock);
+      p->time_enter = ticks;
+      release(&tickslock);
+    }
+    
+    if(queue_level > 2) {
+      if(p->priority) p->priority--;
+      acquire(&tickslock);
+      p->time_enter = ticks;
+      release(&tickslock);
+      queue_level--;
+    }
+
+    p->mlfq_level = queue_level;
+  }
   if(queue_level == 0) {
     L0_push(p);
   } else if (queue_level == 1) {

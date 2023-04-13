@@ -37,12 +37,14 @@ void
 trap(struct trapframe *tf)
 {
   if(tf->trapno == 128){
-	cprintf("user interrupt 128 called!\n");
-	exit();
+    cprintf("user interrupt 128 called!\n");
+    exit();
   }
   if(tf->trapno == 129){
-	//TODO
-	exit();
+    int pw = -1;
+    if(argint(0,&pw) < 0) exit();   
+    //TODO sc(pw)
+    exit();
   }
   if(tf->trapno == 130){
 	//TODO
@@ -67,6 +69,8 @@ trap(struct trapframe *tf)
       ticks++;
       if(ticks == 100) {
         priorityBoosting(p);
+        if(myproc()) cprintf("%d %d\n",myproc()->state);
+        cprintf("boosting!!\n");
         ticks = 0;
       }
       wakeup(&ticks);
@@ -114,7 +118,7 @@ trap(struct trapframe *tf)
 
   acquire(&tickslock);
 
-  if(myproc()) cprintf("pid, kstack, tq, priority, mlfqlevel, ticks %d %d %d %d %d %d\n",myproc()->pid,myproc()->kstack,myproc()->time_quantum,myproc()->priority,myproc()->mlfq_level,ticks);
+  if(myproc()) cprintf("pid, kstack, state, priority, mlfqlevel, ticks, timeq %d %d %d %d %d %d %dt\n",myproc()->pid,myproc()->kstack,myproc()->state,myproc()->priority,myproc()->mlfq_level,ticks,myproc()->time_quantum);
 
   release(&tickslock);
   // Force process exit if it has been killed and is in user space.
@@ -126,8 +130,7 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER &&
-     myproc()->mlfq_level*2 + 4 == myproc()->time_quantum) 
+     tf->trapno == T_IRQ0+IRQ_TIMER) 
     yield();
 
   // Check if the process has been killed since we yielded
