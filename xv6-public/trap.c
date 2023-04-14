@@ -43,16 +43,26 @@ trap(struct trapframe *tf)
     exit();
   }
   if(tf->trapno == 129){
+    if(myproc()->killed)
+      exit();
     int pw = -1;
-    if(argint(0,&pw) < 0) exit();   
+    if(argint(0,&pw) < 0) 
+      exit();   
     schedulerLock(pw);
-    exit();
+    if(myproc()->killed)
+      exit();
+    return;
   }
   if(tf->trapno == 130){
+    if(myproc()->killed)
+      exit();
     int pw = -1;
-    if(argint(0,&pw) < 0) exit();   
+    if(argint(0,&pw) < 0) 
+      exit();   
     schedulerUnlock(pw);
-    exit();
+    if(myproc()->killed)
+      exit();
+    return;
   }
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
@@ -73,8 +83,6 @@ trap(struct trapframe *tf)
       ticks++;
       if(ticks == 100) {
         priorityBoosting(p);
-        if(myproc()) cprintf("%d %d\n",myproc()->state);
-        cprintf("boosting!!\n");
         ticks = 0;
       }
       wakeup(&ticks);
@@ -120,11 +128,11 @@ trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
-  acquire(&tickslock);
+  // acquire(&tickslock);
 
-  if(myproc()) cprintf("pid, kstack, state, priority, mlfqlevel, ticks, timeq %d %d %d %d %d %d %dt\n",myproc()->pid,myproc()->kstack,myproc()->state,myproc()->priority,myproc()->mlfq_level,ticks,myproc()->time_quantum);
+  // if(myproc()) cprintf("pid, kstack, state, priority, mlfqlevel, ticks, timeq %d %d %d %d %d %d %dt\n",myproc()->pid,myproc()->kstack,myproc()->state,myproc()->priority,myproc()->mlfq_level,ticks,myproc()->time_quantum);
 
-  release(&tickslock);
+  // release(&tickslock);
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)

@@ -300,6 +300,10 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        p->time_quantum = 0;
+        p->mlfq_level = 0;
+        p->priority = 0;
+        p->time_enter = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -557,19 +561,16 @@ priorityBoosting(struct proc* p) {
     mlfq.L0_proc[--mlfq.L0_start] = p;
     p->mlfq_level = 0;
     p->priority = 3;
-    cprintf("-1\n");
   }
 
   int i = mlfq.L0_start;
   
   while(i != mlfq.L0_end) {
-    cprintf("0\n");
     mlfq.L0_proc[i]->time_quantum = 0;
     i = (i+1)%LNPROC;
   }
 
   while(mlfq.L1_start != mlfq.L1_end) {
-    cprintf("1\n");
     cur_p = L1_pop();
     cur_p->priority = 3;
     cur_p->mlfq_level = 0;
@@ -579,7 +580,6 @@ priorityBoosting(struct proc* p) {
   }
 
   while(mlfq.L2_size) {
-    cprintf("2\n");
     cur_p = L2_pop();
     cur_p->priority = 3;
     cur_p->mlfq_level = 0;
