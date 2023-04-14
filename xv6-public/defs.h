@@ -136,6 +136,9 @@ void            wakeup(void*);
 void            yield(void);
 void            setPriority(uint pid, uint priority);
 void            priorityBoosting(struct proc* p);
+struct proc*    verifyProc(uint password);
+void            schedulerLock(uint password);
+void            schedulerUnlock(uint password);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

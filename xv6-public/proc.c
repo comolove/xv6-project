@@ -552,6 +552,7 @@ priorityBoosting(struct proc* p) {
   acquire(&ptable.lock);
   struct proc* cur_p;
   if(p) {
+    if(p->lock_flag == 1) p->lock_flag = 0;
     if(!mlfq.L0_start) mlfq.L0_start = LNPROC;
     mlfq.L0_proc[--mlfq.L0_start] = p;
     p->mlfq_level = 0;
@@ -586,6 +587,58 @@ priorityBoosting(struct proc* p) {
     cur_p->time_enter = 0;
     L0_push(cur_p);
   }
+
+  release(&ptable.lock);
+}
+
+
+struct proc*
+verifyProc(uint password) {
+  struct proc* p = myproc();
+
+  if(!p) return 0;
+
+  if(password != 2019060682) {
+    if(kill(p->pid) == -1) return 0;
+    cprintf("lock failed pid: %d, time quantum: %d, ready queue level: %d\n",p->pid,p->time_quantum,p->mlfq_level);
+    return 0;
+  }
+
+  return p;
+}
+
+void 
+schedulerLock(uint password) {
+  struct proc* p;
+
+  if((p = verifyProc(password)) == 0) {
+    return;
+  }
+
+  p->lock_flag = 1;
+
+  acquire(&tickslock);
+  ticks = 0;
+  release(&tickslock);
+}
+
+void 
+schedulerUnlock(uint password) {
+  struct proc* p;
+
+  if((p = verifyProc(password)) == 0) return;
+
+  if(p->lock_flag == 0) return;
+
+  p->lock_flag = 0;
+
+  acquire(&ptable.lock);
+
+  if(!mlfq.L0_start) mlfq.L0_start = LNPROC;
+  mlfq.L0_proc[--mlfq.L0_start] = p;
+  p->mlfq_level = 0;
+  p->priority = 3;
+  p->time_quantum = 0;
 
   release(&ptable.lock);
 }

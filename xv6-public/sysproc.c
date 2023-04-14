@@ -118,3 +118,27 @@ sys_setPriority(void)
   setPriority(pid,priority);
   return 0;
 }
+
+int
+sys_schedulerLock(void)
+{
+  int pw;
+
+  if(argint(0, &pw) < 0)
+    return -1;
+
+  schedulerLock(pw);
+  return 0;
+}
+
+int
+sys_schedulerUnlock(void)
+{
+  int pw;
+
+  if(argint(0, &pw) < 0)
+    return -1;
+
+  schedulerUnlock(pw);
+  return 0;
+}

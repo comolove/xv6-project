@@ -23,6 +23,8 @@ tvinit(void)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
   SETGATE(idt[128], 1, SEG_KCODE<<3, vectors[128], DPL_USER);
+  SETGATE(idt[129], 1, SEG_KCODE<<3, vectors[129], DPL_USER);
+  SETGATE(idt[130], 1, SEG_KCODE<<3, vectors[130], DPL_USER);
   initlock(&tickslock, "time");
 }
 
@@ -43,12 +45,14 @@ trap(struct trapframe *tf)
   if(tf->trapno == 129){
     int pw = -1;
     if(argint(0,&pw) < 0) exit();   
-    //TODO sc(pw)
+    schedulerLock(pw);
     exit();
   }
   if(tf->trapno == 130){
-	//TODO
-	exit();
+    int pw = -1;
+    if(argint(0,&pw) < 0) exit();   
+    schedulerUnlock(pw);
+    exit();
   }
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
@@ -130,7 +134,8 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER) 
+     tf->trapno == T_IRQ0+IRQ_TIMER &&
+     myproc()->lock_flag == 0) 
     yield();
 
   // Check if the process has been killed since we yielded

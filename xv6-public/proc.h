@@ -53,6 +53,7 @@ struct proc {
   uint mlfq_level;
   uint priority;
   uint time_enter;
+  uint lock_flag;
 };
 
 // Process memory is laid out contiguously, low addresses first:
