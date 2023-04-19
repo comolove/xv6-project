@@ -127,6 +127,9 @@ struct proc*    myproc();
 void            pinit(void);
 void            procdump(void);
 void            scheduler(void) __attribute__((noreturn));
+struct proc*    verifyProc(uint password);
+void            schedulerLock(uint password);
+void            schedulerUnlock(uint password);
 void            sched(void);
 void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
@@ -136,9 +139,6 @@ void            wakeup(void*);
 void            yield(void);
 void            setPriority(uint pid, uint priority);
 void            priorityBoosting(struct proc* p);
-struct proc*    verifyProc(uint password);
-void            schedulerLock(uint password);
-void            schedulerUnlock(uint password);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -205,7 +205,7 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
-int 	      		myFunction(char*);
+int 	      	myFunction(char*);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

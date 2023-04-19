@@ -21,6 +21,7 @@ struct proc*
 L0_pop() {
   struct proc* p = mlfq.L0_proc[mlfq.L0_start++];
   mlfq.L0_start %= LNPROC;
+  cprintf("L0 %d %d\n",mlfq.L0_start, mlfq.L0_end);
   return p;
 }
 
@@ -34,6 +35,7 @@ struct proc*
 L1_pop() {
   struct proc* p = mlfq.L1_proc[mlfq.L1_start++];
   mlfq.L1_start %= LNPROC;
+  cprintf("L1 %d %d\n",mlfq.L1_start, mlfq.L1_end);
   return p;
 }
 
@@ -95,6 +97,7 @@ L2_pop(void) {
     cur_index = smaller_child_index;
   }
 
+  cprintf("L2 %d %d\n",mlfq.L2_size,pop_p->pid);
   return pop_p;
 }
 
@@ -102,14 +105,17 @@ int
 L0_scheduling(void) {
   struct proc *p;
   struct cpu *c = mycpu();
-  int proc_cnt = 0;
+  int proc_cnt = 0, index = 0;
   c->proc = 0;
 
   while(mlfq.L0_start != mlfq.L0_end){
+    index = mlfq.L0_start;
     p = L0_pop();
 
-    if(p->state != RUNNABLE)
+    if(p->state != RUNNABLE) {
+      mlfq.L0_proc[index] = 0;
       continue;
+    }
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -133,14 +139,17 @@ int
 L1_scheduling(void) {
   struct proc *p;
   struct cpu *c = mycpu();
-  int proc_cnt = 0;
+  int proc_cnt = 0, index = 0;
   c->proc = 0;
 
   while(mlfq.L1_start != mlfq.L1_end){
+    index = mlfq.L1_start;
     p = L1_pop();
 
-    if(p->state != RUNNABLE)
+    if(p->state != RUNNABLE) {
+      mlfq.L1_proc[index] = 0;
       continue;
+    }
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -165,14 +174,17 @@ int
 L2_scheduling(void) {
   struct proc *p;
   struct cpu *c = mycpu();
-  int proc_cnt = 0;
+  int proc_cnt = 0, index = 0;
   c->proc = 0;
 
   while(mlfq.L2_size > 0) {
+    index = mlfq.L2_size;
     p = L2_pop();
 
-    if(p->state != RUNNABLE)
+    if(p->state != RUNNABLE) {
+      mlfq.L2_proc[index] = 0;
       continue;
+    }
     // Switch to chosen process.  It is the process's job
     // to release mlfq.lock and then reacquire it
     // before jumping back to us.
@@ -199,22 +211,20 @@ L2_scheduling(void) {
 void 
 enqueue(struct proc* p) {
   uint queue_level = p->mlfq_level;
+  cprintf("pid: %d L%d %dt\n",p->pid, p->mlfq_level,p->time_quantum);
   if(p->time_quantum == 2*queue_level+4) {
     queue_level++;
     p->time_quantum = 0;
     
-    if(queue_level == 2) {
+    if(queue_level >= 2) {
       acquire(&tickslock);
       p->time_enter = ticks;
       release(&tickslock);
-    }
-    
-    if(queue_level > 2) {
-      if(p->priority) p->priority--;
-      acquire(&tickslock);
-      p->time_enter = ticks;
-      release(&tickslock);
-      queue_level--;
+
+      if(queue_level > 2) {
+        if(p->priority) p->priority--;
+        queue_level--;
+      }
     }
 
     p->mlfq_level = queue_level;
@@ -232,5 +242,5 @@ enqueue(struct proc* p) {
 int 
 getLevel(void) {
   if(myproc()) return myproc()->mlfq_level;
-  return -1;
+  return 1;
 }

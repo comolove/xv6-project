@@ -81,12 +81,14 @@ trap(struct trapframe *tf)
       struct proc* p = myproc();
       if(p) p->time_quantum++;
       ticks++;
-      if(ticks == 100) {
-        priorityBoosting(p);
-        ticks = 0;
-      }
       wakeup(&ticks);
-      release(&tickslock);
+      if(ticks % 100 == 0) {
+        release(&tickslock);
+        priorityBoosting(p);
+      } else {
+        release(&tickslock);
+      }
+      
     }
     lapiceoi();
     break;
@@ -143,7 +145,8 @@ trap(struct trapframe *tf)
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER &&
-     myproc()->lock_flag == 0) 
+     myproc()->lock_flag == 0 &&
+     (myproc()->mlfq_level != 2 || myproc()->time_quantum == 8)) 
     yield();
 
   // Check if the process has been killed since we yielded

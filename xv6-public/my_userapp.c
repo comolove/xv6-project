@@ -4,8 +4,13 @@
 
 int main(int argc, char* argv[]) {
 
-	__asm__("int $129");
-	__asm__("int $130");
+	// __asm__("int $129");
+	// __asm__("int $130");
+	schedulerLock(2019060682);
+	schedulerLock(2019060682);
+
+	printf(1,"4\n");
+	exit();
 	return 0;
 
 	if(argc <= 1) {

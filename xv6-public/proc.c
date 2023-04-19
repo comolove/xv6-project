@@ -113,6 +113,9 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->time_enter = 0;
+  p->time_quantum = 0;
+  p->lock_flag = 0;
   p->priority = 3;
   p->mlfq_level = 0;
 
@@ -300,10 +303,6 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        p->time_quantum = 0;
-        p->mlfq_level = 0;
-        p->priority = 0;
-        p->time_enter = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -554,6 +553,7 @@ setPriority(uint pid, uint priority) {
 void
 priorityBoosting(struct proc* p) {
   acquire(&ptable.lock);
+  cprintf("Boosting!\n");
   struct proc* cur_p;
   if(p) {
     if(p->lock_flag == 1) p->lock_flag = 0;
@@ -572,6 +572,7 @@ priorityBoosting(struct proc* p) {
 
   while(mlfq.L1_start != mlfq.L1_end) {
     cur_p = L1_pop();
+    if(cur_p->state != RUNNABLE) continue;
     cur_p->priority = 3;
     cur_p->mlfq_level = 0;
     cur_p->time_quantum = 0;
@@ -581,6 +582,7 @@ priorityBoosting(struct proc* p) {
 
   while(mlfq.L2_size) {
     cur_p = L2_pop();
+    if(cur_p->state != RUNNABLE) continue;
     cur_p->priority = 3;
     cur_p->mlfq_level = 0;
     cur_p->time_quantum = 0;
@@ -614,6 +616,8 @@ schedulerLock(uint password) {
   if((p = verifyProc(password)) == 0) {
     return;
   }
+
+  if(p->lock_flag == 1) return;
 
   p->lock_flag = 1;
 
