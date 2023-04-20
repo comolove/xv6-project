@@ -2,11 +2,11 @@
 #include "stat.h"
 #include "user.h"
 
-#define NUM_LOOP 10000
+#define NUM_LOOP 100000
 #define NUM_YIELD 20000
 #define NUM_SLEEP 1000
 
-#define NUM_THREAD 5
+#define NUM_THREAD 4
 #define MAX_LEVEL 5
 
 int parent;

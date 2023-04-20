@@ -137,6 +137,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int             isEmpty(void);
 void            setPriority(uint pid, uint priority);
 void            priorityBoosting(struct proc* p);
 
