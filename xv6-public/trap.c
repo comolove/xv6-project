@@ -42,6 +42,7 @@ trap(struct trapframe *tf)
     cprintf("user interrupt 128 called!\n");
     exit();
   }
+  // fetch argument with argint and exec scheduler lock / unlock
   if(tf->trapno == 129){
     if(myproc()->killed)
       exit();
@@ -130,11 +131,6 @@ trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
-  // acquire(&tickslock);
-
-  // if(myproc()) cprintf("pid, kstack, state, priority, mlfqlevel, ticks, timeq %d %d %d %d %d %d %dt\n",myproc()->pid,myproc()->kstack,myproc()->state,myproc()->priority,myproc()->mlfq_level,ticks,myproc()->time_quantum);
-
-  // release(&tickslock);
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
@@ -143,9 +139,11 @@ trap(struct trapframe *tf)
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
+  // if locked, don't yield
+  // if L2 process, don't yield until time_quantum = 8
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER &&
-     myproc()->lock_flag == 0 && !isEmpty() &&
+     myproc()->lock_flag == 0 &&
      (myproc()->mlfq_level != 2 || myproc()->time_quantum == 8)) 
     yield();
 

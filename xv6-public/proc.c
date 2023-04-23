@@ -329,42 +329,7 @@ wait(void)
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
 
-// void
-// scheduler(void)
-// {
-//   struct proc *p;
-//   struct cpu *c = mycpu();
-//   c->proc = 0;
-  
-//   for(;;){
-//     // Enable interrupts on this processor.
-//     sti();
-
-//     // Loop over process table looking for process to run.
-//     acquire(&ptable.lock);
-//     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-//       if(p->state != RUNNABLE)
-//         continue;
-
-//       // Switch to chosen process.  It is the process's job
-//       // to release ptable.lock and then reacquire it
-//       // before jumping back to us.
-//       c->proc = p;
-//       switchuvm(p);
-//       p->state = RUNNING;
-
-//       swtch(&(c->scheduler), p->context);
-//       switchkvm();
-
-//       // Process is done running for now.
-//       // It should have changed its p->state before coming back.
-//       c->proc = 0;
-//     }
-//     release(&ptable.lock);
-
-//   }
-// }
-
+// schduling ready queue by each queue's process count
 void
 scheduler(void)
 { 
@@ -570,14 +535,8 @@ procdump(void)
   }
 }
 
-int
-isEmpty(void) {
-  acquire(&ptable.lock);
-  int ret = mlfq.L0_start == mlfq.L0_end && mlfq.L1_start == mlfq.L1_end && mlfq.L2_size == 0;
-  release(&ptable.lock);
-  return ret;
-}
 
+// find matched process with pid, set priority
 void
 setPriority(uint pid, uint priority) {
   struct proc* p;
@@ -586,6 +545,15 @@ setPriority(uint pid, uint priority) {
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       p->priority = priority;
+      cprintf("pid %d priority %d mlfq level %d\n",p->pid,p->priority,p->mlfq_level);
+      if(p->mlfq_level == 2) {
+        int index = L2_find(pid,1);
+        if(!(index = L2_find(pid,1))) {
+          heapify(index);
+          cprintf("1\n");
+        }
+        cprintf("2\n");
+      }
 
       release(&ptable.lock);
       return;
@@ -594,6 +562,8 @@ setPriority(uint pid, uint priority) {
   release(&ptable.lock);
 }
 
+// current process: push into L0 queue head
+// remain process: initiate process state
 void
 priorityBoosting(struct proc* p) {
   acquire(&ptable.lock);
@@ -604,6 +574,7 @@ priorityBoosting(struct proc* p) {
     mlfq.L0_proc[--mlfq.L0_start] = p;
     p->mlfq_level = 0;
     p->priority = 3;
+    p->state = RUNNABLE;
   }
 
   int i = mlfq.L0_start;
@@ -633,10 +604,12 @@ priorityBoosting(struct proc* p) {
     L0_push(cur_p);
   }
 
+  if(p) sched();
+
   release(&ptable.lock);
 }
 
-
+// varify process with password
 struct proc*
 verifyProc(uint password) {
   struct proc* p = myproc();
@@ -645,13 +618,14 @@ verifyProc(uint password) {
 
   if(password != 2019060682) {
     if(kill(p->pid) == -1) return 0;
-    cprintf("lock failed pid: %d, time quantum: %d, ready queue level: %d\n",p->pid,p->time_quantum,p->mlfq_level);
+    cprintf("verifying failed pid: %d, time quantum: %d, ready queue level: %d\n",p->pid,p->time_quantum,p->mlfq_level);
     return 0;
   }
 
   return p;
 }
 
+// just set process's lock flag
 void 
 schedulerLock(uint password) {
   struct proc* p;
@@ -665,10 +639,12 @@ schedulerLock(uint password) {
   p->lock_flag = 1;
 
   acquire(&tickslock);
-  ticks = 0;
+  ticks /= 100;
+  ticks *= 100;
   release(&tickslock);
 }
 
+// unset process's lock flag and push_front in L0 queue
 void 
 schedulerUnlock(uint password) {
   struct proc* p;
@@ -686,6 +662,8 @@ schedulerUnlock(uint password) {
   p->mlfq_level = 0;
   p->priority = 3;
   p->time_quantum = 0;
+  p->state = RUNNABLE;
+  sched();
 
   release(&ptable.lock);
 }

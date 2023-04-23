@@ -37,11 +37,8 @@ L1_pop() {
   return p;
 }
 
-//push to leaf element and heapify.
 void
-L2_push(struct proc* p) {
-  mlfq.L2_proc[++mlfq.L2_size] = p;
-  uint cur_index = mlfq.L2_size;
+upper_heapify(uint cur_index) {
   uint parent_index = cur_index/2;
   struct proc* cur_p,* parent_p;
 
@@ -59,13 +56,10 @@ L2_push(struct proc* p) {
   }
 }
 
-//pop root element and heapify remain elements.
-struct proc*
-L2_pop(void) {
-  struct proc* pop_p = mlfq.L2_proc[1];
+void
+lower_heapify(uint cur_index) {
   struct proc* cur_p;
-  uint cur_index = 1, smaller_child_index;
-  mlfq.L2_proc[1] = mlfq.L2_proc[mlfq.L2_size--];
+  uint smaller_child_index;
   while(cur_index < mlfq.L2_size) {
     cur_p = mlfq.L2_proc[cur_index];
     smaller_child_index = cur_index;
@@ -93,9 +87,51 @@ L2_pop(void) {
 
     cur_index = smaller_child_index;
   }
+}
+
+void
+heapify(uint cur_index) {
+  upper_heapify(cur_index);
+  lower_heapify(cur_index);
+} 
+
+//push to leaf element and heapify.
+//sort by priority, enter_time
+void
+L2_push(struct proc* p) {
+  mlfq.L2_proc[++mlfq.L2_size] = p;
+  upper_heapify(mlfq.L2_size);
+}
+
+//pop root element and heapify remain elements.
+struct proc*
+L2_pop(void) {
+  struct proc* pop_p = mlfq.L2_proc[1];
+  mlfq.L2_proc[1] = mlfq.L2_proc[mlfq.L2_size--];
+  lower_heapify(1);
   return pop_p;
 }
 
+// find index with pid in L2
+int
+L2_find(uint pid, int cur_index) {
+  struct proc* p = mlfq.L2_proc[cur_index];
+  int ret = 0;
+  if(p->pid == pid) return cur_index;
+
+  if(2*cur_index <= mlfq.L2_size) {
+    ret = L2_find(pid, 2*cur_index);
+    if(ret) return ret;
+  }
+  if(2*cur_index+1 <= mlfq.L2_size) {
+    ret = L2_find(pid, 2*cur_index+1);
+    if(ret) return ret;
+  }
+
+  return ret;
+}
+
+//scheduling in L0 queue, return executed processes count
 int
 L0_scheduling(void) {
   struct proc *p;
@@ -130,6 +166,7 @@ L0_scheduling(void) {
   return proc_cnt;
 }
 
+//scheduling in L1 queue, return executed processes count
 int
 L1_scheduling(void) {
   struct proc *p;
@@ -165,6 +202,7 @@ L1_scheduling(void) {
   return proc_cnt;
 }
 
+//scheduling in L2 queue, return executed processes count
 int 
 L2_scheduling(void) {
   struct proc *p;
@@ -203,6 +241,8 @@ L2_scheduling(void) {
   return proc_cnt;
 }
 
+// enqueue to ready queue
+// determine where to go by looking process's status
 void 
 enqueue(struct proc* p) {
   uint queue_level = p->mlfq_level;
@@ -232,9 +272,10 @@ enqueue(struct proc* p) {
 
 }
 
+// just return process's ready queue level
 int 
 getLevel(void) {
   struct proc* p = myproc();
   if(p) return p->mlfq_level;
-  return 1;
+  return -1;
 }

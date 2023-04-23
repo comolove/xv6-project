@@ -108,6 +108,10 @@ void            L2_push(struct proc* p);
 struct proc*    L0_pop(void);
 struct proc*    L1_pop(void);
 struct proc*    L2_pop(void);
+void            upper_heapify(uint cur_index);
+void            lower_heapify(uint cur_index);
+void            heapify(uint cur_index);
+int             L2_find(uint pid, int cur_index);
 int             L0_scheduling(void);
 int             L1_scheduling(void);
 int             L2_scheduling(void);
@@ -137,7 +141,6 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-int             isEmpty(void);
 void            setPriority(uint pid, uint priority);
 void            priorityBoosting(struct proc* p);
 

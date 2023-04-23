@@ -63,6 +63,7 @@ int fork_children3()
   }
   return parent;
 }
+
 void exit_children()
 {
   if (getpid() != parent)
@@ -74,7 +75,6 @@ int main(int argc, char *argv[])
 {
   int i, pid;
   int count[MAX_LEVEL] = {0};
-//  int child;
 
   parent = getpid();
 
